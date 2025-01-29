@@ -1,60 +1,169 @@
-local function V9pX3(s)
-    return string.char(((s * 17) % 256) + 33)
+local function ObfuscateChar(c)
+    return string.char(((c * 31) % 256) + 47)
 end
 
-local function encodeString(str)
+local function EncodeStr(inputStr)
     local encoded = ""
-    for i = 1, #str do
-        encoded = encoded .. V9pX3(str:byte(i))
+    for i = 1, #inputStr do
+        encoded = encoded .. ObfuscateChar(inputStr:byte(i))
     end
     return encoded
 end
 
-local gH9T2 = {encodeString("Q1wX3"), encodeString("P9lM2"), encodeString("M7nT8"), encodeString("X5zR6")}
-local tJ29L = game:GetService("ReplicatedStorage")
-local kP8xQ = tJ29L:WaitForChild(encodeString("NoxStuffButReplicatedStorage"))
-local nM3cZ = kP8xQ:WaitForChild(encodeString("Events"))
-local Y2kYV = nM3cZ:WaitForChild(encodeString("CheckQuests"))
-
-local function RfX94()
-    for vH9GvT, dV7aU in ipairs(gH9T2) do
-        Y2kYV:FireServer(dV7aU)
-    end
-end
-
-local function Wp3T7()
-    while true do
-        RfX94()
-        wait(math.random(0.9, 1.1))
-    end
-end
-
-local qT2xY = {
-    encodeString("X1cT3"), encodeString("Y4bM5"), encodeString("Z7nQ2"), encodeString("K9pL8"),
-    encodeString("W6vG1"), encodeString("J8rX4"), encodeString("L3mY7")
+local obfuscatedServices = {
+    EncodeStr("ServiceA"), EncodeStr("ServiceB"), EncodeStr("ServiceC"), EncodeStr("ServiceD")
 }
 
-local function Lp9W3()
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HiddenStorage = ReplicatedStorage:WaitForChild(EncodeStr("HiddenContainer"))
+local EventContainer = HiddenStorage:WaitForChild(EncodeStr("Triggers"))
+local QuestTrigger = EventContainer:WaitForChild(EncodeStr("QuestSignal"))
+
+local function FireTriggers()
+    for _, service in ipairs(obfuscatedServices) do
+        QuestTrigger:FireServer(service)
+    end
+end
+
+local function TriggerLoop()
     while true do
-        for cM2xT, eP7vQ in pairs(game:GetDescendants()) do
-            if eP7vQ:IsA("Part") and table.find(qT2xY, eP7vQ.Name) and eP7vQ:FindFirstChild(encodeString("ClickDetector")) then
+        FireTriggers()
+        wait(math.random(0.85, 1.15))
+    end
+end
+
+local hiddenObjects = {
+    EncodeStr("ObjectA"), EncodeStr("ObjectB"), EncodeStr("ObjectC"), EncodeStr("ObjectD")
+}
+
+local function SearchAndActivate()
+    while true do
+        for _, object in pairs(game:GetDescendants()) do
+            if object:IsA("Part") and table.find(hiddenObjects, object.Name) and object:FindFirstChild(EncodeStr("ClickHandler")) then
                 pcall(function()
-                    fireclickdetector(eP7vQ.ClickDetector)
+                    fireclickdetector(object.ClickHandler)
                 end)
             end
         end
-        wait(math.random(0.75, 0.85))
+        wait(math.random(0.7, 0.9))
     end
 end
 
-local function noiseFunction()
-    local garbage = 0
-    for i = 1, math.random(100, 200) do
-        garbage = garbage + math.random() * i
+local function RandomNoise()
+    local junk = 0
+    for _ = 1, math.random(120, 250) do
+        junk = junk + math.random() * math.random(1, 100)
     end
-    return garbage
+    return junk
 end
 
-coroutine.wrap(Wp3T7)()
-coroutine.wrap(Lp9W3)()
-noiseFunction()
+coroutine.wrap(TriggerLoop)()
+coroutine.wrap(SearchAndActivate)()
+RandomNoise()
+
+local function MaskString(s)
+    return string.char(((s * 29) % 256) + 53)
+end
+
+local VirtualInput = Instance.new(MaskString("InputHandler"))
+local UserInput = game:GetService(MaskString("UserHandler"))
+local HookRegistry = {}
+
+local function ValidateText(T)
+    if type(T) ~= "string" then return false end
+    return (string.split(T, "\0"))[1]
+end
+
+local function ArgProcessor(self, ...)
+    return self, {...}
+end
+
+local function SecureServiceCall(...)
+    local OriginalService
+    OriginalService = function(...)
+        local self, Index = ...
+        local Response = OriginalService(...)
+        if type(Index) == "string" and ValidateText(Index) == MaskString("InputHandler") then
+            error(("'%s' is not a valid Service name"):format(ValidateText(Index)))
+            return
+        end
+        return Response
+    end
+end
+
+local PreviousFindService = hookfunction(game.FindService, function(...)
+    local self, Index = ...
+    local Response = PreviousFindService(...)
+    if type(Index) == "string" and ValidateText(Index) == MaskString("InputHandler") then
+        return
+    end
+    return Response
+end)
+
+SecureServiceCall(game.GetService)
+SecureServiceCall(game.getService)
+SecureServiceCall(game.service)
+
+local OldNamecall
+OldNamecall = hookmetamethod(game, "__namecall", function(...)
+    local self, Arguments = ArgProcessor(...)
+    local Method = getnamecallmethod()
+    if typeof(self) == "Instance" and self == game and Method:lower():match("service") and ValidateText(Arguments[1]) == MaskString("InputHandler") then
+        if Method == "FindService" then return end
+        local Success, Error = pcall(function()
+            setnamecallmethod(Method)
+            game[Method](game, MaskString("InvalidHandler"))
+        end)
+        if not Error:match("is not a valid member") then
+            error(Error:replace(MaskString("InvalidHandler"), MaskString("InputHandler")))
+            return
+        end
+    end
+    return OldNamecall(...)
+end)
+
+local OldWindowHook
+OldWindowHook = hookmetamethod(UserInput.WindowFocused, "__index", function(...)
+    local self, Index = ...
+    local Response = OldWindowHook(...)
+    if type(Response) ~= "function" and (tostring(self):find("WindowFocused") or tostring(self):find("WindowFocusReleased")) and not table.find(HookRegistry, Response) then
+        table.insert(HookRegistry, Response)
+        if Index:lower() == "wait" then
+            local HookWait
+            HookWait = hookfunction(Response, function(...)
+                local instance = ...
+                if instance == self then
+                    instance = Instance.new("BindableEvent").Event
+                end
+                return HookWait(instance)
+            end)
+        elseif Index:lower() == "connect" then
+            local HookConnect
+            HookConnect = hookfunction(Response, function(...)
+                local instance, Func = ...
+                if instance == self then
+                    Func = function() return end
+                end
+                return HookConnect(instance, Func)
+            end)
+        end
+    end
+    return Response
+end)
+
+for _, conn in next, getconnections(UserInput.WindowFocusReleased) do
+    conn:Disable()
+end
+for _, conn in next, getconnections(UserInput.WindowFocused) do
+    conn:Disable()
+end
+
+if not iswindowactive() and not getgenv().WindowFocused then
+    firesignal(UserInput.WindowFocused)
+    getgenv().WindowFocused = true
+end
+
+while true do
+    VirtualInput:SendKeyEvent(true, Enum.KeyCode.Unknown, false, game)
+    task.wait(Random.new():NextNumber(10, 180))
+end
